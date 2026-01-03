@@ -1,0 +1,142 @@
+#+TITLE: Emacs OpenSCAD mode with Tree-sitter support
+#+AUTHOR: Yoshinari Nomura
+#+EMAIL:
+#+DATE: 2025-12-28
+#+OPTIONS: H:3 num:2 toc:nil
+#+OPTIONS: ^:nil \n:nil ::t |:t f:t tex:t
+#+OPTIONS: d:nil tags:t
+#+OPTIONS: author:t email:nil creator:nil
+#+OPTIONS: timestamp:nil timestamps:nil
+#+LANGUAGE: en
+
+[[file:README-ja.org][日本語 (Japanese)]]
+
+* What is scad-ts-mode
+  A major mode for OpenSCAD with Tree-sitter support for indentation, font-locking,
+  and imenu integration.
+
+  Provides better indentation compared to the existing [[https://github.com/openscad/emacs-scad-mode][scad-mode]] which is based on c-mode indent.
+
+* System Requirements
+  + Emacs 29.3 or newer (Tree-sitter support)
+
+* Installation and Setup
+** Package Installation
+   + TBA
+   + Will be published on MELPA. Currently, clone the repository, add it to ~load-path~, and run ~(require 'scad-ts-mode)~.
+
+** Package Setup
+   Example init.el configuration:
+   #+begin_src emacs-lisp
+     (use-package treesit
+       :init
+       (add-to-list 'auto-mode-alist '("\\.scad\\'" . scad-ts-mode))
+       (add-to-list 'major-mode-remap-alist '(scad-mode . scad-ts-mode)))
+
+     (use-package scad-ts-mode
+       :load-path "~/path/to/scad-ts-mode"
+       :ensure t
+       :after treesit
+       :mode "\\.scad\\'"
+       :init
+       (setq scad-ts-mode-indent-offset 2)
+       :config
+       ;; Optional
+       (add-hook 'scad-ts-mode-hook #'eglot-ensure)
+       (add-hook 'scad-ts-mode-hook #'electric-pair-local-mode)
+       :bind
+       (:map scad-ts-mode-map
+             ("C-c C-c" . 'my-scad-focus-or-open)))
+   #+end_src
+
+   Example to launch a corresponding OpenSCAD GUI instance from an Emacs buffer:
+   #+begin_src emacs-lisp
+     (defun my-scad-focus-or-open ()
+       "Open current buffer with openscad GUI command."
+       (interactive nil scad-mode scad-ts-mode)
+       (save-buffer)
+       (call-process "openscad-setfocus" nil 0 nil (buffer-file-name))
+       (sit-for 0.1)
+       (select-frame-set-input-focus (selected-frame))
+       (if (featurep 'scad-dbus)
+           (hydra-scad-dbus/body)))
+   #+end_src
+
+   file:scripts/openscad-setfocus is a custom shell script that opens
+   an OpenSCAD GUI instance if one is not already running, or simply
+   focuses the existing instance without opening a new one.
+
+** Tree-sitter Language Grammar Installation
+   Run ~M-x scad-ts-mode-install-language-grammar~ to install
+   =~/.emacs.d/tree-sitter/libtree-sitter-openscad.so=.
+
+* Integration with Other Packages
+** Eglot
+   Using the built-in eglot with openscad-lsp provides automatic integration
+   with flymake, eldoc, and imenu for a comfortable editing experience.
+
+   First, install openscad-lsp:
+   #+begin_src shell-script
+     cargo install openscad-lsp
+   #+end_src
+
+   Example Eglot configuration:
+   #+begin_src emacs-lisp
+     (use-package eglot
+       :config
+       (add-to-list 'eglot-server-programs
+                    '(scad-ts-mode . ("openscad-lsp" "--stdio")))
+       :bind
+       (:map eglot-mode-map
+             ("C-c r" . eglot-rename)
+             ("C-c o" . eglot-code-action-organize-imports)
+             ("C-c h" . eldoc)
+             ("C-c f" . flymake-show-buffer-diagnostics)
+             ("C-c F" . flymake-show-project-diagnostics)))
+   #+end_src
+
+** scad-dbus
+   If you're on Linux with D-Bus support, [[https://github.com/Lenbok/scad-dbus][Lenbok/scad-dbus]] is useful.
+   #+begin_src emacs-lisp
+     (use-package scad-dbus
+       :after scad-ts-mode
+       :load-path "~/path/to/scad-dbus"
+       :bind
+       (:map
+        scad-ts-mode-map ("C-c o" . 'my-scad-focus-or-open))
+       :config
+       (use-package hydra
+         :ensure t))
+   #+end_src
+
+** Org-babel
+   To use ~scad-ts-mode~ for code block editing and syntax highlighting
+   during HTML export in org-babel:
+   #+begin_src emacs-lisp
+     (add-to-list 'org-src-lang-modes '("scad" . scad-ts))
+   #+end_src
+
+   When using with [[https://github.com/openscad/emacs-scad-mode/blob/main/ob-scad.el][ob-scad.el]], it's better to configure export
+   settings as follows (see: [[https://github.com/openscad/emacs-scad-mode/issues/4][emacs-scad-mode/issues/4]])
+   #+begin_src emacs-lisp
+     (setq org-babel-default-header-args:scad
+       '((:results . "file")
+         (:exports . "code")))
+   #+end_src
+
+* Developer Information
+** Documentation
+   Referenced documentation:
+  + [[https://tree-sitter.github.io/tree-sitter/][Tree-sitter]]
+  +  GNU Emacs Lisp Reference Manual
+    + [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Parsing-Program-Source.html][Parsing Program Source]]
+    + [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Parser_002dbased-Font-Lock.html][Parser-based Font Lock]]
+    + [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Parser_002dbased-Indentation.html][Parser-based Indentation]]
+      + ~treesit-simple-indent-presets~ variable
+      + ~treesit-simple-indent-rules~ variable
+  + [[https://github.com/emacs-mirror/emacs/blob/master/admin/notes/tree-sitter/starter-guide][STARTER GUIDE ON WRITING MAJOR MODE WITH TREE-SITTER]]
+
+** Debugging Tree-sitter Code
+   + ~M-x treesit-explore-mode~ :: Displays the parse tree corresponding to the code being edited.
+   + ~(setq treesit--indent-verbose t)~ :: Shows which indentation rules are triggered when pressing TAB.
+   + ~M-x treesit-check-indent~ :: Compares current buffer indentation against what the indentation rules would provide.

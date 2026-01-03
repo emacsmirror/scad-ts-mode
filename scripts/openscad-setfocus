@@ -1,0 +1,151 @@
+#!/bin/bash
+
+# openscad-setfocus --- Invoke and Focus control openscad GUI
+#
+# Copyright (C) 2025-2026 Yoshinari Nomura
+#
+# AUthor: Yoshinari Nomura <nom@quickhack.net>
+# Created: December 2025
+# Version: 0.1.0
+#
+# Usage: openscad-setfocus FILENAME.scad
+#
+# Steps of operation:
+#
+# 1) In the GUI of OpenSCAD, open FILENAME.scad.
+#
+#    + If there is already an instance that has opened the file, do nothing.
+#    + If there are any instances open with other files, they will be closed.
+#
+# 2) Send Ctrl+Shift+V (View All) to the OpenSCAD instance
+#
+#    This activates DBus.
+#
+# 3) Regain the focus of the X-Window.
+#
+
+################################################################
+# X window helper
+
+# Get current focused window id
+function get_active_window() {
+  xdotool getactivewindow 2>/dev/null
+}
+
+# Find window id by pid
+function find_window_by_pid() {
+  local pid="$1"
+
+  xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -1
+}
+
+# Find PIDs by Window class
+function find_pids_by_class() {
+  local class="${1:-OpenSCAD}"
+
+  wmctrl -lxp | awk '$4~/'$class'$/{print $3}'
+}
+
+# Set window focus to WINDOW_ID
+function activate_window() {
+  local WINDOW_ID="$1"
+
+  if [ -n "$WINDOW_ID" ]; then
+    xdotool windowactivate "$WINDOW_ID"
+  fi
+}
+
+################################################################
+# Process PID finder
+
+# Find existing filename in args of process
+function find_filename_in_args() {
+  local pid="$1"
+
+  while IFS= read -r -d '' arg; do
+    if [ -f "$arg" ]; then
+      echo "$arg"
+      return 0
+    fi
+  done < <(tail -z -n+2 /proc/$pid/cmdline 2>/dev/null)
+
+  return 1
+}
+
+# Find openscad process that processing FILENAME
+function find_openscad_instance() {
+  local filename="$1"
+
+  # Get PID list of OpenSCAD GUI
+  local pids=$(find_pids_by_class OpenSCAD)
+
+  # From multiple OpenSCAD instances, get pid bound to FILENAME
+  for pid in $pids
+  do
+    if [ "$(find_filename_in_args $pid)" = "$filename" ]; then
+      echo "$pid"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# Send Keyboard event to activate DBus I/F
+# See:
+#   OpenSCAD #3367 DBus not accepting actions on startup:
+#     https://github.com/openscad/openscad/issues/3367
+#   Note in https://github.com/Lenbok/scad-dbus?tab=readme-ov-file
+#
+function kick_openscad() {
+  local WINDOW_ID="$1"
+  xdotool windowactivate --sync $WINDOW_ID key ctrl+shift+v #2>/dev/null
+}
+
+# Wait OpenSCAD and send Ctrl+Shift+V event to WINDOW_ID.
+# Ctrl+Shift+V activates DBus I/F.
+#
+function wait_and_kick_openscad() {
+  local SCAD_PID="$1" TIMEOUT="$2" ORIG_WINDOW="$3"
+  local count=0 SCAD_WINDOW
+
+  while [ "$count" -lt "$TIMEOUT" ]
+  do
+    SCAD_WINDOW=$(find_window_by_pid $SCAD_PID)
+    if [ -n "$SCAD_WINDOW" ]; then
+      kick_openscad "$SCAD_WINDOW"
+      activate_window "$ORIG_WINDOW"
+    fi
+    sleep 1
+    count=$(expr $count + 1)
+  done
+}
+
+################################################################
+## main
+
+file="$1"
+
+if [ -z "$file" ]; then
+  echo "Usage: openscad-setfocus FILENAME" >&2
+  exit 1
+fi
+
+# Find OpenSCAD instance that is processing "$file"
+SCAD_PID=$(find_openscad_instance "$file")
+
+ORIG_WINDOW=$(get_active_window)
+
+if [ -n "$SCAD_PID" ]; then
+  SCAD_WINDOW=$(find_window_by_pid $SCAD_PID)
+  kick_openscad "$SCAD_WINDOW"
+  activate_window "$ORIG_WINDOW"
+else
+  kill $(find_pids_by_class OpenSCAD)
+  openscad "$@" &
+  SCAD_PID=$!
+  # wait_and_kick_openscad $SCAD_PID 5 "$ORIG_WINDOW"
+  activate_window "$ORIG_WINDOW"
+fi
+
+exit 0
