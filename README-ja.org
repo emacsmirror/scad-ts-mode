@@ -9,6 +9,8 @@
 #+OPTIONS: timestamp:nil timestamps:nil
 #+LANGUAGE: ja
 
+[[file:README.org][English]]
+
 * scad-ts-mode とは
   OpenSCAD のためのメジャーモードです．Tree-sitter による indent と font-locking，
   imenu との連携をサポートしています．
