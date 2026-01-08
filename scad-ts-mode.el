@@ -136,11 +136,15 @@ See `regexp-opt' for details."
      ((match nil "arguments" nil 2 nil) (nth-sibling 1) 0)
      ((match nil "parameters" nil 2 nil) (nth-sibling 1) 0)
      ((match nil "list" nil 2 nil) (nth-sibling 1) 0)
+     ;; let(a=1, b=1...
+     ((match nil "assignments" nil 2 nil) (nth-sibling 1) 0)
 
      ;; First argument/list-value should be indented
      ((parent-is "arguments") parent-bol scad-ts-mode-indent-offset)
      ((parent-is "parameters")  (nth-sibling 0) 1)
      ((parent-is "list") parent-bol scad-ts-mode-indent-offset)
+     ;; let(a=1, b=1...
+     ((parent-is "assignments") parent-bol scad-ts-mode-indent-offset)
 
      ;; If the node is inside an Error, the most likely situation is
      ;; that you pressed TAB while an if-statement or array-block is
