@@ -215,7 +215,7 @@ See `regexp-opt' for details."
         $fs $fn $t $vpr $vpt $vpd $vpf $children $preview))
         @font-lock-builtin-face)))
 
-   ;; 2) Builtin: builtin functions/operations
+   ;; 2) Builtin: operations
    :language 'openscad
    :feature 'builtin
    `((module_call name: (_) @font-lock-builtin-face
@@ -226,6 +226,23 @@ See `regexp-opt' for details."
         projection resize rotate rotate_extrude scale
         sphere square surface text translate union
         echo render children import))
+               @font-lock-builtin-face)))
+
+   ;; 2) Builtin: functions
+   :language 'openscad
+   :feature 'builtin
+   `((function_call name: (_) @font-lock-builtin-face
+       (:match ,(scad-ts-mode--any '(
+        ;; Type test functions
+        is_bool is_function is_list is_num
+        is_string is_undef
+        ;; Functions
+        chr concat lookup ord parent_module search
+        str version version_num
+        ;; Mathematical
+        abs acos asin atan atan2 ceil cos cross exp
+        floor len ln log max min norm pow rands round
+        sign sin sqrt tan))
                @font-lock-builtin-face)))
 
    ;; 2) Keyword
