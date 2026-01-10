@@ -348,6 +348,10 @@ standard `eglot'.  Eglot will work seamlessly with `flymake-mode',
   (when (treesit-ready-p 'openscad)
     (treesit-parser-create 'openscad)
 
+    ;; Comments
+    (setq-local comment-start "// ")
+    (setq-local comment-end "")
+
     ;; Navigation like `treesit-beginning-of-defun'.
     (setq-local treesit-defun-type-regexp
                 (regexp-opt '("function_item"
