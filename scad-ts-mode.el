@@ -38,11 +38,16 @@
 
 (require 'treesit)
 
+(defgroup scad-ts nil
+  "Major mode for editing OpenSCAD code."
+  :prefix "scad-ts-"
+  :group 'languages)
+
 (defcustom scad-ts-mode-indent-offset 2
   "Number of spaces for each indentation step in `scat-ts-mode'."
   :type 'integer
   :safe 'integerp
-  :group 'scad)
+  :group 'scad-ts)
 
 ;; * Tree-sitter node manipulation
 ;;
@@ -342,7 +347,7 @@ enable `electric-pair-mode' with this mode.
 It is also recommended to use it together with openscad-lsp and Emacs'
 standard `eglot'.  Eglot will work seamlessly with `flymake-mode',
 `eldoc', and `imenu'."
-  :group 'scad
+  :group 'scad-ts
   :syntax-table scad-ts-mode--syntax-table
 
   (when (treesit-ready-p 'openscad)
