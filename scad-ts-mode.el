@@ -49,6 +49,153 @@
   :safe 'integerp
   :group 'scad-ts)
 
+(defcustom scad-ts-command "openscad"
+  "Path to OpenSCAD executable."
+  :type 'string
+  :safe 'stringp
+  :group 'scad-ts)
+
+(defcustom scad-ts-after-open-gui-functions nil
+  "Abnormal hook run after `scad-ts-mode-open-gui' is called.
+Each function is called with two arguments:
+  NEW-PROCESS - Non-nil if a new process was started
+  PID - Process ID of the OpenSCAD process
+
+This hook is always called, regardless of whether a new process was
+started or not."
+  :type 'hook
+  :group 'scad-ts)
+
+(defvar-keymap scad-ts-mode-map
+  :doc "Keymap for `scad-ts-mode'."
+  :parent prog-mode-map
+  "C-c C-c" #'scad-ts-mode-open-gui)
+
+;; * GUI Process Handling
+
+(defvar scad-ts--gui-process nil
+  "Global OpenSCAD GUI process shared across all scad-ts-mode buffers.")
+
+(defun scad-ts--gui-alive-p ()
+  "Return non-nil if OpenSCAD process is alive."
+  (and scad-ts--gui-process
+       (process-live-p scad-ts--gui-process)))
+
+(defun scad-ts--gui-current-file ()
+  "Return file currently opened in OpenSCAD, or nil."
+  (when (scad-ts--gui-alive-p)
+    (process-get scad-ts--gui-process :current-file)))
+
+(defun scad-ts--gui-sentinel (proc event)
+  "Sentinel for OpenSCAD process PROC with EVENT."
+  (when (memq (process-status proc) '(exit signal))
+    (message "OpenSCAD GUI %s: %s"
+             (process-status proc)
+             (string-trim event))
+    (scad-ts--gui-cleanup-process)))
+
+(defun scad-ts--gui-cleanup-process ()
+  "Clean up OpenSCAD process."
+  (when (and scad-ts--gui-process
+             (process-live-p scad-ts--gui-process))
+    (delete-process scad-ts--gui-process))
+  (setq scad-ts--gui-process nil))
+
+(defun scad-ts--gui-start-process (scad-file)
+  "Start OpenSCAD GUI with SCAD-FILE."
+  (save-buffer)
+  ;; Clean up any existing process
+  (scad-ts--gui-cleanup-process)
+  (let ((args (list scad-ts-command scad-file)))
+    (setq scad-ts--gui-process
+          (make-process
+           :name "OpenSCAD-GUI"
+           :command args
+           :buffer " *OpenSCAD-GUI*"
+           :noquery t
+           :connection-type 'pipe
+           :sentinel #'scad-ts--gui-sentinel))
+    ;; Store current file in process properties
+    (process-put scad-ts--gui-process :current-file scad-file)
+    (message "Open OpenSCAD with %s"
+             (file-name-nondirectory scad-file))))
+
+;; XXX: Workaround function
+(defun scad-ts--gui-ping ()
+  "Regain input focus after raise OpenSCAD window.
+When Emacs launches OpenSCAD GUI, Emacs loses input focus.
+This function regains focus on Emacs using xdotool.
+
+Also, sends Shift+Ctrl+V to OpenSCAD for D-Bus workaround.
+See: https://github.com/openscad/openscad/issues/3367"
+  (let ((pid (and (scad-ts--gui-alive-p)
+                  (process-id scad-ts--gui-process))))
+    (unless pid
+      (user-error "No OpenSCAD GUI process (%s)" pid))
+    (if (not (executable-find "xdotool"))
+        (message "No xdotool found.")
+      (call-process
+       "xdotool" nil 0 nil "search" "--all" "--onlyvisible"
+       "--pid" (number-to-string pid) "--class" "OpenSCAD"
+       "windowactivate" "--sync" "key" "ctrl+shift+v"
+       "windowactivate" "--sync" (frame-parameter nil 'outer-window-id))
+      (sit-for 0.1))))
+
+;; XXX: Workaround function
+(defun scad-ts--gui-focus-control (new-process pid)
+  "Control input focus of newly created OpenSCAD GUI prcess.
+In some environments, OpenSCAD GUI, when newly launched, steals input
+focus and becomes unresponsive for a while.  This function adjusts the
+timing until stable operation becomes possible.
+
+This function is intended to be used with
+`scad-ts-after-open-gui-functions':
+
+  (add-hook \\='scad-ts-after-open-gui-functions
+            #\\='scad-ts--gui-focus-control)"
+  ;; Wait for OpenSCAD getting focus
+  (when new-process
+    (message "Waiting new GUI process (%d)..." pid)
+    (sit-for 1))
+  ;; Ping and focus back to Emacs
+  (scad-ts--gui-ping)
+  ;; Wait longer before OpenSCAD becomes responsive
+  (when new-process
+    (sit-for 3)
+    ;; Ping again
+    (scad-ts--gui-ping)
+    (message "Waiting new GUI process (%d)...Done." pid))
+  (if (featurep 'scad-dbus)
+      (call-interactively 'hydra-scad-dbus/body)))
+
+;;;###autoload
+(defun scad-ts-mode-open-gui ()
+  "Open current buffer's file in OpenSCAD GUI.
+Since the GUI be singleton, it does nothing if the GUI is already
+opening the target file. If the GUI is opening another file, the
+existing GUI is terminated and a new one will be opened.
+
+In any case, `scad-ts-after-open-gui-functions' hook is called
+with two arguments: NEW-PROCESS (non-nil if started new GUI) and PID."
+  (interactive)
+  (unless (buffer-file-name)
+    (user-error "Buffer is not visiting a file"))
+  (let ((scad-file (expand-file-name (buffer-file-name)))
+        (current-file (scad-ts--gui-current-file))
+        (new-process nil))
+    (cond
+     ;; Already opened
+     ((and current-file (string= scad-file current-file))
+      (message "OpenSCAD is already showing %s"
+               (file-name-nondirectory scad-file)))
+     ;; No process or different scad-file
+     (t
+      (scad-ts--gui-start-process scad-file)
+      (setq new-process t)))
+    (run-hook-with-args 'scad-ts-after-open-gui-functions
+                        new-process
+                        (process-id scad-ts--gui-process))))
+
 ;; * Tree-sitter node manipulation
 ;;
 ;; Retrieving Nodes (GNU Emacs Lisp Reference Manual)
@@ -335,6 +482,9 @@ This command requires git and C compiler."
 (define-derived-mode scad-ts-mode prog-mode "SCAD[ts]"
   "Major mode for OpenSCAD files using tree-sitter.
 
+Keybindings:
+  \\{scad-ts-mode-map}
+
 To use tree-sitter OpenSCAD modes by default, evaluate
 
   (add-to-list \\='major-mode-remap-alist \\='(scad-mode . scad-ts-mode))
@@ -350,6 +500,7 @@ standard `eglot'.  Eglot will work seamlessly with `flymake-mode',
 `eldoc', and `imenu'."
   :group 'scad-ts
   :syntax-table scad-ts-mode--syntax-table
+  :keymap scad-ts-mode-map
 
   (when (treesit-ready-p 'openscad)
     (treesit-parser-create 'openscad)
