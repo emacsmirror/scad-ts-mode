@@ -43,7 +43,7 @@
   :prefix "scad-ts-"
   :group 'languages)
 
-(defcustom scad-ts-mode-indent-offset 2
+(defcustom scad-ts-indent-offset 2
   "Number of spaces for each indentation step in `scat-ts-mode'."
   :type 'integer
   :safe 'integerp
@@ -134,8 +134,8 @@ See `regexp-opt' for details."
      ((node-is "else") standalone-parent 0)
 
      ;; Indent the inside of union/if block or transform_chain
-     ((parent-is "block") standalone-parent scad-ts-mode-indent-offset)
-     ((parent-is "transform_chain") parent-bol scad-ts-mode-indent-offset)
+     ((parent-is "block") standalone-parent scad-ts-indent-offset)
+     ((parent-is "transform_chain") parent-bol scad-ts-indent-offset)
 
      ;; Second or later arguments/list-values follow the first sibling
      ((match nil "arguments" nil 2 nil) (nth-sibling 1) 0)
@@ -145,11 +145,11 @@ See `regexp-opt' for details."
      ((match nil "assignments" nil 2 nil) (nth-sibling 1) 0)
 
      ;; First argument/list-value should be indented
-     ((parent-is "arguments") parent-bol scad-ts-mode-indent-offset)
+     ((parent-is "arguments") parent-bol scad-ts-indent-offset)
      ((parent-is "parameters")  (nth-sibling 0) 1)
-     ((parent-is "list") parent-bol scad-ts-mode-indent-offset)
+     ((parent-is "list") parent-bol scad-ts-indent-offset)
      ;; let(a=1, b=1...
-     ((parent-is "assignments") parent-bol scad-ts-mode-indent-offset)
+     ((parent-is "assignments") parent-bol scad-ts-indent-offset)
 
      ;; If the node is inside an Error, the most likely situation is
      ;; that you pressed TAB while an if-statement or array-block is
@@ -161,10 +161,10 @@ See `regexp-opt' for details."
      ;; In such a case, it would make sense to indent because the user
      ;; pressed the TAB anyway.
      ;;
-     ((parent-is "ERROR") parent-bol scad-ts-mode-indent-offset)
-     ((node-is "ERROR") parent-bol scad-ts-mode-indent-offset)
+     ((parent-is "ERROR") parent-bol scad-ts-indent-offset)
+     ((node-is "ERROR") parent-bol scad-ts-indent-offset)
 
-     (no-node parent-bol scad-ts-mode-indent-offset)))
+     (no-node parent-bol scad-ts-indent-offset)))
   "Tree-sitter indent rules for `scad-ts-mode'.")
 
 ;; * Font-locking
