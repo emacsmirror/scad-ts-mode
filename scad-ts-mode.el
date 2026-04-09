@@ -37,6 +37,7 @@
 ;;; Code:
 
 (require 'treesit)
+(require 'c-ts-common) ; For comment indent and filling.
 
 (defgroup scad-ts nil
   "Major mode for editing OpenSCAD code."
@@ -522,6 +523,8 @@ standard `eglot'.  Eglot will work seamlessly with `flymake-mode',
     ;; Comments
     (setq-local comment-start "// ")
     (setq-local comment-end "")
+    (setq-local comment-line-break-function
+                'c-ts-common-comment-indent-new-line)
 
     ;; Navigation like `treesit-beginning-of-defun'.
     (setq-local treesit-defun-type-regexp
