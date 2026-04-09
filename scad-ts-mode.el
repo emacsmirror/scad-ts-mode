@@ -378,7 +378,7 @@ See `regexp-opt' for details."
    :override t
    `(((special_variable "$" (_)) @font-lock-builtin-face
       (:match ,(scad-ts-mode--any '(
-        $fs $fn $t $vpr $vpt $vpd $vpf $children $preview))
+        $fs $fn $fa $t $vpr $vpt $vpd $vpf $children $preview))
         @font-lock-builtin-face)))
 
    ;; 2) Builtin: operations
