@@ -430,7 +430,9 @@ See `regexp-opt' for details."
    ;; 2) String
    :language 'openscad
    :feature 'string
-   '((string) @font-lock-string-face)
+   :override t
+   '(((string) @font-lock-string-face)
+     ((include_path) @font-lock-string-face))
 
    ;; 3) Constant: PI/undef
    :language 'openscad
