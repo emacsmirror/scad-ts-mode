@@ -37,6 +37,7 @@
 ;;; Code:
 
 (require 'treesit)
+(require 'c-ts-common) ; For comment indent and filling.
 
 (defgroup scad-ts nil
   "Major mode for editing OpenSCAD code."
@@ -378,7 +379,7 @@ See `regexp-opt' for details."
    :override t
    `(((special_variable "$" (_)) @font-lock-builtin-face
       (:match ,(scad-ts-mode--any '(
-        $fs $fn $t $vpr $vpt $vpd $vpf $children $preview))
+        $fs $fn $fa $t $vpr $vpt $vpd $vpf $children $preview))
         @font-lock-builtin-face)))
 
    ;; 2) Builtin: operations
@@ -429,7 +430,9 @@ See `regexp-opt' for details."
    ;; 2) String
    :language 'openscad
    :feature 'string
-   '((string) @font-lock-string-face)
+   :override t
+   '(((string) @font-lock-string-face)
+     ((include_path) @font-lock-string-face))
 
    ;; 3) Constant: PI/undef
    :language 'openscad
@@ -522,6 +525,8 @@ standard `eglot'.  Eglot will work seamlessly with `flymake-mode',
     ;; Comments
     (setq-local comment-start "// ")
     (setq-local comment-end "")
+    (setq-local comment-line-break-function
+                'c-ts-common-comment-indent-new-line)
 
     ;; Navigation like `treesit-beginning-of-defun'.
     (setq-local treesit-defun-type-regexp
